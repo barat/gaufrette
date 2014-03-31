@@ -15,12 +15,14 @@ use Gaufrette\Adapter;
  * @author  Leszek Prabucki <leszek.prabucki@gmail.com>
  */
 class AmazonS3 implements Adapter,
-                          MetadataSupporter
+                          MetadataSupporter,
+                          HeaderSupporter
 {
     protected $service;
     protected $bucket;
     protected $ensureBucket = false;
     protected $metadata;
+    protected $header;
     protected $options;
 
     public function __construct(AmazonClient $service, $bucket, $options = array())
@@ -92,6 +94,25 @@ class AmazonS3 implements Adapter,
 
         return isset($this->metadata[$path]) ? $this->metadata[$path] : array();
     }
+    
+    public function getHeader($key) {
+        $path = $this->computePath($key);
+        return isset($this->header[$path]) ? $this->header[$path] : array();
+    }
+    
+    public function setHeader($key, $headers) {
+        $availableHeaders = [
+            'Content-Disposition' => 'Content-Disposition',
+            'ContentDisposition' => 'Content-Disposition',
+            'contentDisposition' => 'Content-Disposition'
+        ];
+        $path = $this->computePath($key);
+        foreach ($headers as $header => $value) {
+            if (array_key_exists($header, $availableHeaders)) {
+                $this->header[$path][$availableHeaders[$header]] = $value;
+            }
+        }
+    }
 
     /**
      * {@inheritDoc}
@@ -143,6 +164,7 @@ class AmazonS3 implements Adapter,
         $this->ensureBucketExists();
 
         $opt = array_replace_recursive(
+            array('headers' => $this->getHeader($key)),
             array('acl'  => $this->options['acl']),
             $this->getMetadata($key),
             array('body' => $content)
